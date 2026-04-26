@@ -463,6 +463,9 @@ func (c *Cloud) Request(baseURL, apiURL, params string, headers map[string]strin
 	}
 
 	if res1.Code != 0 {
+		if isTokenExpired(res1.Code, res1.Message) {
+			return nil, fmt.Errorf("xiaomi: %s: %w", res1.Message, ErrTokenExpired)
+		}
 		return nil, errors.New("xiaomi: " + res1.Message)
 	}
 
