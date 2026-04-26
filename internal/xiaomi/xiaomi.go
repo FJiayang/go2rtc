@@ -395,17 +395,44 @@ func apiAuth(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		userID, token := auth.UserToken()
-		auth = nil
 
 		cloudsMu.Lock()
-		if tokens == nil {
-			tokens = map[string]string{userID: token}
-		} else {
-			tokens[userID] = token
+		if clouds == nil {
+			clouds = map[string]*xiaomi.Cloud{}
 		}
+		clouds[userID] = auth
+
+		if tokens == nil {
+			tokens = map[string]string{}
+		}
+		tokens[userID] = token
 		cloudsMu.Unlock()
 
-		err = app.PatchConfig([]string{"xiaomi", userID}, token)
+		auth = nil
+
+		if err2 := app.PatchConfig([]string{"xiaomi", userID}, token); err2 != nil {
+			log.Error().Err(err2).Str("user", userID).Msg("[xiaomi] PatchConfig passToken failed")
+		}
+
+		if username != "" && password != "" {
+			encPassword, encErr := xiaomi.Encrypt(password)
+			if encErr != nil {
+				log.Error().Err(encErr).Str("user", userID).Msg("[xiaomi] encrypt password failed")
+			} else {
+				if accounts == nil {
+					accounts = map[string]Account{}
+				}
+				accounts[userID] = Account{Username: username, EncPassword: encPassword}
+
+				acctData := map[string]string{
+					"username":     username,
+					"enc_password": encPassword,
+				}
+				if err2 := app.PatchConfig([]string{"xiaomi_accounts", userID}, acctData); err2 != nil {
+					log.Error().Err(err2).Str("user", userID).Msg("[xiaomi] PatchConfig accounts failed")
+				}
+			}
+		}
 	}
 
 	if err != nil {
