@@ -134,6 +134,23 @@ func cloudRequest(userID, region, apiURL, params string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	result, err := cloud.Request(GetBaseURL(region), apiURL, params, nil)
+	if err == nil {
+		return result, nil
+	}
+
+	if !errors.Is(err, xiaomi.ErrTokenExpired) {
+		return nil, err
+	}
+
+	log.Debug().Str("user", userID).Msg("[xiaomi] token expired, attempting refresh")
+
+	cloud, err = refreshCloud(userID)
+	if err != nil {
+		return nil, err
+	}
+
 	return cloud.Request(GetBaseURL(region), apiURL, params, nil)
 }
 
