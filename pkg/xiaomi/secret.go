@@ -77,7 +77,10 @@ func deriveKey() []byte {
 	hkdfReader := hkdf.New(sha256.New, info, []byte("go2rtc-xiaomi"), []byte("password-encryption"))
 
 	key := make([]byte, 32)
-	_, _ = io.ReadFull(hkdfReader, key)
+	// HKDF-SHA256 is deterministic and never errors; panic on unexpected failure
+	if _, err := io.ReadFull(hkdfReader, key); err != nil {
+		panic("hkdf: unexpected read error: " + err.Error())
+	}
 	return key
 }
 

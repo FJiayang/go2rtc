@@ -1,6 +1,7 @@
 package xiaomi
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,16 @@ func TestDecryptInvalidBase64(t *testing.T) {
 func TestDecryptTruncatedCiphertext(t *testing.T) {
 	_, err := Decrypt("AAAAAAAAAA==")
 	assert.Error(t, err)
+}
+
+func TestDecryptTamperedCiphertext(t *testing.T) {
+	ct, err := Encrypt("sensitive")
+	require.NoError(t, err)
+	raw, _ := base64.StdEncoding.DecodeString(ct)
+	raw[len(raw)-1] ^= 0xFF
+	tampered := base64.StdEncoding.EncodeToString(raw)
+	_, err = Decrypt(tampered)
+	assert.Error(t, err, "tampered ciphertext should be rejected")
 }
 
 func TestDeriveKeyConsistency(t *testing.T) {
