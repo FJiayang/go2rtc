@@ -21,11 +21,13 @@ import (
 
 func Init() {
 	var v struct {
-		Cfg map[string]string `yaml:"xiaomi"`
+		Cfg      map[string]string  `yaml:"xiaomi"`
+		Accounts map[string]Account `yaml:"xiaomi_accounts"`
 	}
 	app.LoadConfig(&v)
 
 	tokens = v.Cfg
+	accounts = v.Accounts
 
 	log = app.GetLogger("xiaomi")
 
@@ -55,6 +57,13 @@ var log zerolog.Logger
 var tokens map[string]string
 var clouds map[string]*xiaomi.Cloud
 var cloudsMu sync.Mutex
+
+type Account struct {
+	Username    string `yaml:"username"`
+	EncPassword string `yaml:"enc_password"`
+}
+
+var accounts map[string]Account
 
 func getCloud(userID string) (*xiaomi.Cloud, error) {
 	cloudsMu.Lock()
