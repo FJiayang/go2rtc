@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/AlexxIT/go2rtc/internal/api"
 	"github.com/AlexxIT/go2rtc/internal/app"
@@ -64,6 +65,7 @@ type Account struct {
 }
 
 var accounts map[string]Account
+var lastRefresh map[string]time.Time
 
 func getCloud(userID string) (*xiaomi.Cloud, error) {
 	cloudsMu.Lock()
@@ -82,6 +84,48 @@ func getCloud(userID string) (*xiaomi.Cloud, error) {
 	} else {
 		clouds[userID] = cloud
 	}
+	return cloud, nil
+}
+
+func refreshCloud(userID string) (*xiaomi.Cloud, error) {
+	cloudsMu.Lock()
+	defer cloudsMu.Unlock()
+
+	if lastRefresh != nil {
+		if t, ok := lastRefresh[userID]; ok && time.Since(t) < 5*time.Second {
+			log.Debug().Str("user", userID).Msg("[xiaomi] refresh deduped within 5s window")
+			return clouds[userID], nil
+		}
+	}
+
+	cloud, err := relogin(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	newUserID, newToken := cloud.UserToken()
+
+	if clouds == nil {
+		clouds = map[string]*xiaomi.Cloud{}
+	}
+	clouds[userID] = cloud
+
+	if tokens == nil {
+		tokens = map[string]string{}
+	}
+	tokens[userID] = newToken
+
+	if lastRefresh == nil {
+		lastRefresh = map[string]time.Time{}
+	}
+	lastRefresh[userID] = time.Now()
+
+	if err := app.PatchConfig([]string{"xiaomi", newUserID}, newToken); err != nil {
+		log.Error().Err(err).Str("user", userID).Msg("[xiaomi] PatchConfig passToken failed")
+	}
+
+	log.Info().Str("user", userID).Msg("[xiaomi] relogin successful")
+
 	return cloud, nil
 }
 
